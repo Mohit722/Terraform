@@ -1,0 +1,85 @@
+# Terraform-Ansible-EC2-Setup
+
+his project demonstrates how to create an EC2 instance using Terraform and integrate it with Ansible. The setup includes creating a new EC2 instance (node2), ensuring it has necessary packages installed, and updating the Ansible hosts file on the controller node.
+
+Prerequisites
+AWS account with necessary permissions
+Terraform installed
+Ansible installed on the controller node
+SSH key pair (devops.pem) available on the controller node
+Step-by-Step Process
+1. Clone the Repository
+git clone https://github.com/your-username/terraform-ansible-ec2-setup.git
+cd terraform-ansible-ec2-setup
+
+2. Update Terraform Configuration
+Edit the main.tf file to include your AWS region, AMI ID, instance type, key name, and existing security group ID.
+
+provider "aws" {
+  region = "us-west-2"
+}
+
+resource "aws_instance" "node2" {
+  ami           = "ami-0c55b159cbfafe1f0"  # Replace with your desired AMI
+  instance_type = "t2.micro"
+  key_name      = "your-key-pair"
+  vpc_security_group_ids = ["sg-xxxxxxxx"]  # Replace with your existing security group ID
+
+  provisioner "remote-exec" {
+    inline = [
+      "sudo apt-get update",
+      "sudo apt-get install -y python3"
+    ]
+
+    connection {
+      type        = "ssh"
+      user        = "ubuntu"  # Replace with the appropriate user for your AMI
+      private_key = file("/absolute/path/to/your-key-pair.pem")  # Use an absolute path
+      host        = self.public_ip
+    }
+  }
+
+  tags = {
+    Name = "Node2"
+  }
+}
+
+output "node2_ip" {
+  value = aws_instance.node2.public_ip
+}
+
+3. Change Permissions of the SSH Key
+Ensure the devops.pem file has the correct permissions.
+
+chmod 400 /home/ubuntu/terraform/assignment/devops.pem
+
+4. Initialize and Apply Terraform Configuration
+Initialize and apply the Terraform configuration to create the new EC2 instance.
+
+terraform init
+terraform apply -auto-approve
+
+5. Update Ansible Hosts File
+Run the update_hosts.sh script to update the Ansible hosts file on the controller node with the new node’s details.
+
+./update_hosts.sh
+
+update_hosts.sh Script
+#!/bin/bash
+
+# Fetch the instance IP from Terraform output
+NODE2_IP=$(terraform output -raw node2_ip)
+
+# Update the Ansible hosts file on the controller node
+ssh -t -i /home/ubuntu/terraform/assignment/devops.pem ubuntu@35.154.61.143 <<EOF
+sudo bash -c 'echo "[node2]" >> /etc/ansible/hosts'
+sudo bash -c 'echo "$NODE2_IP ansible_user=ubuntu ansible_ssh_private_key_file=/etc/ansible/devops.pem" >> /etc/ansible/hosts'
+EOF
+
+6. Verify the Setup
+Ensure the new node is listed in the Ansible hosts file on the controller node.
+
+cat /etc/ansible/hosts
+
+Conclusion
+This setup allows you to automate the creation of an EC2 instance using Terraform and integrate it with Ansible for configuration management. If you encounter any issues or have questions, feel free to open an issue in the repository
